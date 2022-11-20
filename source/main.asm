@@ -35,7 +35,7 @@ bcc +
 +
 
 MPrintF "Opening File...\n"
-MFOpen "LOG.TXT", ",P,A"
+MFOpen "LOG.TXT", ",P,W"
 bcc +
 	MPrintF "File Error! - Abort\n"
 	jmp End
