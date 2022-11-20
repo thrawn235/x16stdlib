@@ -34,9 +34,9 @@ MPull .macro
 
 MLoadR .macro
 	;load a value into a Zero Page register
-	lda #<\2
+	lda <\2
 	sta \1l
-	lda #>\2
+	lda >\2
 	sta \1h
 	.endm
 

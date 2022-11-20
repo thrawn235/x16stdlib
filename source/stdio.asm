@@ -94,7 +94,7 @@ PrintF:
 			lda PrintFPlaceholder
 			cmp #"i"			;signed int ?
 			bne +
-				;
+				jsr PrintIntShortSigned
 			+
 			lda PrintFPlaceholder
 			cmp #"u"			;unsigned int ?
@@ -234,7 +234,7 @@ PrintHexNibbleAccu:
 	;Accu = Nibble to Print
 	;clobber = Accu, y, A
 	tay
-	.MLoadR A, HexArray
+	.MLoadR A, #HexArray
 	lda (A), y
 	jsr Print
 	rts
@@ -342,7 +342,7 @@ PrintBinaryLong:
 PrintIntShortAccu:
 	sta PrintIntShortAccuTemp
 	MPush A
-	MLoadR A, PrintIntShortAccuDivisorsTable
+	MLoadR A, #PrintIntShortAccuDivisorsTable
 	lda PrintIntShortAccuTemp
 	;.byte $db
 	ldy #0
@@ -375,8 +375,15 @@ PrintIntShort:
 	lda (A)
 	jsr PrintIntShortAccu
 	rts
-
-
+PrintIntShortSigned:
+	lda (A)
+	jsr PrintSignAccu
+	clc
+	eor #$FF
+	adc #$01
+	lda (A)
+	jsr PrintIntShortAccu
+	rts
 
 stdout: 	.addr BSOUT
 stdMemPtr: 	.addr $0000
@@ -388,30 +395,30 @@ HexArray: 	.text "0123456789ABCDEF"
 MPrintF: .macro source, B=0, C=0, D=0, E=0, F=0, G=0
 	;macro to print inline strings
 	MPush A
-	MLoadR A, txt
+	MLoadR A, #txt
 	.if \B != 0
 		MPush A
-		MLoadR B, \B
+		MLoadR B, #\B
 	.endif
 	.if \C != 0
 		MPush A
-		MLoadR C, \C
+		MLoadR C, #\C
 	.endif
 	.if \D != 0
 		MPush A
-		MLoadR D, \D
+		MLoadR D, #\D
 	.endif
 	.if \E != 0
 		MPush A
-		MLoadR E, \E
+		MLoadR E, #\E
 	.endif
 	.if \F != 0
 		MPush A
-		MLoadR F, \F
+		MLoadR F, #\F
 	.endif
 	.if \G != 0
 		MPush A
-		MLoadR G, \G
+		MLoadR G, #\G
 	.endif
 	jsr PrintF
 	.if \B != 0
@@ -442,22 +449,22 @@ MSPrintF: .macro target, source, B=0, C=0, D=0, E=0, F=0, G=0
 	MLoadR A, txt
 	MLoadR J, \target
 	.if \B != 0
-		MLoadR B, \B
+		MLoadR B, #\B
 	.endif
 	.if \C != 0
-		MLoadR C, \C
+		MLoadR C, #\C
 	.endif
 	.if \D != 0
-		MLoadR D, \D
+		MLoadR D, #\D
 	.endif
 	.if \E != 0
-		MLoadR E, \E
+		MLoadR E, #\E
 	.endif
 	.if \F != 0
-		MLoadR F, \F
+		MLoadR F, #\F
 	.endif
 	.if \G != 0
-		MLoadR G, \G
+		MLoadR G, #\G
 	.endif
 	jsr PrintF
 	jmp +
@@ -467,30 +474,30 @@ MSPrintF: .macro target, source, B=0, C=0, D=0, E=0, F=0, G=0
 MFPrintF: .macro handle=0, source, B=0, C=0, D=0, E=0, F=0, G=0
 	;macro to print inline strings
 	MPush A
-	MLoadR A, txt
+	MLoadR A, #txt
 	.if \B != 0
 		MPush A
-		MLoadR B, \B
+		MLoadR B, #\B
 	.endif
 	.if \C != 0
 		MPush A
-		MLoadR C, \C
+		MLoadR C, #\C
 	.endif
 	.if \D != 0
 		MPush A
-		MLoadR D, \D
+		MLoadR D, #\D
 	.endif
 	.if \E != 0
 		MPush A
-		MLoadR E, \E
+		MLoadR E, #\E
 	.endif
 	.if \F != 0
 		MPush A
-		MLoadR F, \F
+		MLoadR F, #\F
 	.endif
 	.if \G != 0
 		MPush A
-		MLoadR G, \G
+		MLoadR G, #\G
 	.endif
 	ldx \handle
 	jsr FPrintF
@@ -522,6 +529,7 @@ FOpen: .proc
 	;******************************************
 	;Purpose..: Opens a Filestream
 	;Input....: A = pointer to Filename
+	;		  : C = command string (",P,W")
 	;Output...: Accu = Filehandle
 	;Clobbers.: Accu, x, y
 	;Error....: c
@@ -538,35 +546,35 @@ FOpen: .proc
 	+
 
 	;Add ,s,w to filename
-	MLoadR B, fileName
-	MLoadR C, sw 
+	MLoadR B, #fileName
+	;MLoadR C, #sw 
 	jsr strcat
-	MLoadR A, fileName
+	MLoadR A, #fileName
 	jsr strlen
 	ldx #<fileName
 	ldy #>fileName
 	jsr SETNAM
-	
+
 	jsr OPEN
-	bcc +						;Error?
-		jsr FileError
-	+
+	;bcc +						;Error?
+	;	jsr FileError
+	;+
 	lda fileNumber				;return logical file number
 	rts
 
 	fileNumber: .byte $0
-	sw:			.text ",S,A", $0
+	;sw:			.text ",P,A", $0
 	fileName	.text "                   ", $0
 	.pend
 GetFreeFileNumber: .proc
 	MPush A
-	MLoadR A, fileNumbers
+	MLoadR A, #fileNumbers
 	ldy #0
 	Loop:
 		lda (A), y
 		beq +
 			iny
-			cpy #10
+			cpy #14
 			;we ran out...
 			beq +
 			jmp Loop
@@ -578,11 +586,13 @@ GetFreeFileNumber: .proc
 	rts
 	.pend
 
-MFOpen: .macro filename
-	MLoadR A, file
+MFOpen: .macro filename, commandstring=",P,W"
+	MLoadR A, #file
+	MLoadR C, #command
 	jsr FOpen
 	jmp next
-	file: .text \filename,0
+	file: .text \filename, $0
+	command: .text \commandstring, $0
 	next:
 	.endm
 
@@ -600,9 +610,9 @@ FClose: .proc
 	sta fileNumbers,y
 	tya
 	jsr CLOSE
-	bcc +
-		jsr FileError
-	+
+	;bcc +
+	;	jsr FileError
+	;+
 	;jsr CLRCHN
 	rts 
 	.pend
@@ -615,7 +625,6 @@ FPrintF: .proc
 	;Clobbers.: x, y
 	;Error....: None
 	;******************************************
-	;ldx #1
 	jsr CHKOUT	;set the Logical File number to use
 	bcc +
 		jsr FileError
@@ -685,7 +694,7 @@ FRead: .proc
 		+
 		dec Bl
 		beq +
-		del Bh
+		dec Bh
 		beq Done
 		+
 		sta (B)
@@ -704,5 +713,5 @@ FileError:
 
 
 fileNumbers:
-	.byte $1
-	.fill 9, $0
+	.byte $1, $1
+	.fill 12, $0
