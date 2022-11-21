@@ -536,6 +536,10 @@ FOpen: .proc
 	;******************************************
 
 	jsr GetFreeFileNumber
+	bcc+
+		;error, no more filenumbers:
+		rts
+	+
 	sta fileNumber
 	;lda #1 					;logical file number
 	ldx #8 						;device 8 (sdcard)
@@ -567,6 +571,13 @@ FOpen: .proc
 	fileName	.text "                   ", $0
 	.pend
 GetFreeFileNumber: .proc
+	;******************************************
+	;Purpose..: Gets a free integer number from the filenumbers array
+	;Input....: None
+	;Output...: Accu = Filehandle
+	;Clobbers.: Accu, x, y
+	;Error....: c
+	;******************************************
 	MPush A
 	MLoadR A, #fileNumbers
 	ldy #0
@@ -575,7 +586,8 @@ GetFreeFileNumber: .proc
 		beq +
 			iny
 			cpy #14
-			;we ran out...
+			sec
+			rts
 			beq +
 			jmp Loop
 		+
@@ -584,8 +596,12 @@ GetFreeFileNumber: .proc
 	MPull A
 	tya
 	rts
-	.pend
 
+	;variables:
+	fileNumbers:
+		.byte $1, $1
+		.fill 12, $0
+	.pend
 MFOpen: .macro filename, commandstring=",P,W"
 	MLoadR A, #file
 	MLoadR C, #command
@@ -706,12 +722,19 @@ FRead: .proc
 	rts
 	.pend
 
+MFWrite: .macro fileHandle, source, length
+	MLoadR A, /source
+	MLoadR B, /length
+	lda /fileHandle
+	.endm
+
+MFRead: .macro fileHandle, target, length
+	.endm
+
 FileError:
 	jsr READST
 	.byte $db
 	rts
 
 
-fileNumbers:
-	.byte $1, $1
-	.fill 12, $0
+
