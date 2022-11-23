@@ -583,24 +583,19 @@ GetFreeFileNumber: .proc
 	ldy #0
 	Loop:
 		lda (A), y
-		beq +
+		beq FoundFree
 			iny
 			cpy #14
+			bne Loop
+			MPull A
 			sec
 			rts
-			beq +
-			jmp Loop
-		+
+		FoundFree:
 	lda #1	
 	sta (A), y
 	MPull A
 	tya
 	rts
-
-	;variables:
-	fileNumbers:
-		.byte $1, $1
-		.fill 12, $0
 	.pend
 MFOpen: .macro filename, commandstring=",P,W"
 	MLoadR A, #file
@@ -663,23 +658,26 @@ FWrite: .proc
 	;Clobbers.: A,B, Accu, x, y
 	;Error....: None
 	;******************************************
-
 	tax
 	jsr CHKOUT	;set the Logical File number to use
 
 	Loop:
 		lda (A)
-		jsr BASOUT
+		jsr BSOUT
 		inc Al
 		bne +
 		inc Ah
 		+
+
+		lda Bl
 		beq +
 		dec Bl
-		dec Bh
-		beq Done
+		bne ++
 		+
-		;sta (B)
+		lda Bh
+		beq Done
+		dec Bh
+		+
 		bra Loop
 	Done:
 
@@ -699,36 +697,87 @@ FRead: .proc
 	;******************************************
 
 	tax
-	jsr CHKOUT	;set the Logical File number to use
 
+	jsr CHKIN	;set the Logical File number to use
+	
 	Loop:
 		jsr BASIN
 		sta (A)
 		inc Al
-		beq +
+		bne +
 		inc Ah
 		+
-		dec Bl
+
+		lda Bl
 		beq +
-		dec Bh
-		beq Done
+		dec Bl
+		bne ++
 		+
-		sta (B)
+		lda Bh
+		beq Done
+		dec Bh
+		+
 		bra Loop
 	Done:
 
 	ldx #0
-	jsr CHKOUT	;back to the screen
+	jsr CHKIN	;back to the screen
 	rts
 	.pend
 
 MFWrite: .macro fileHandle, source, length
-	MLoadR A, /source
-	MLoadR B, /length
-	lda /fileHandle
+	MLoadR A, \source
+	MLoadR B, \length
+	lda \fileHandle
+	jsr FWrite
 	.endm
 
 MFRead: .macro fileHandle, target, length
+	MLoadR A, \target
+	MLoadR B, \length
+	lda \fileHandle
+	jsr FRead
+	.endm
+
+SendCommand: .proc
+	;******************************************
+	;Purpose..: send a command on the IO command channel
+	;Input....: A = pointer to string to send
+	;			Accu = length of command
+	;Output...: None
+	;Clobbers.: A, Accu, x, y
+	;Error....: None
+	;******************************************
+	pha
+	lda #15 					;logical file number
+	ldx #8 						;device 8 (sdcard)
+	tay							;secondary address (same as file number)
+	jsr SETLFS
+	bcc +						;Error?
+		jsr FileError
+	+
+
+	;MLoadR A, #fileName
+	lda Al
+	tax
+	lda Ah
+	tay
+	pla
+	jsr SETNAM
+
+	jsr OPEN
+	bcc +						;Error?
+		jsr FileError
+	+
+	jsr CLOSE
+	rts
+	.pend
+MSendCommand: .macro command
+	MLoadR A, #command
+	jsr SendCommand
+	jmp next
+	command: .text \command,0
+	next:
 	.endm
 
 FileError:
@@ -736,5 +785,7 @@ FileError:
 	.byte $db
 	rts
 
-
+fileNumbers:
+		.byte $1, $1
+		.fill 12, $0
 

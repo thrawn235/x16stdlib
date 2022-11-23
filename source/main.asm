@@ -16,6 +16,7 @@
 Start:
 jsr GoAnsi
 
+
 MPrintF "Welcome, this is a test program\n"
 MPrintF "Opening File...\n"
 MFOpen "TEST.TST"
@@ -35,7 +36,7 @@ bcc +
 +
 
 MPrintF "Opening File...\n"
-MFOpen "LOG.TXT", ",P,W"
+MFOpen "LOG.TXT", ",P,M"
 bcc +
 	MPrintF "File Error! - Abort\n"
 	jmp End
@@ -43,8 +44,21 @@ bcc +
 sta fileHandle2
 MPrintF "fileHandle = %u\n", fileHandle2
 
-MPrintF "writing to file...\n"
-MFPrintF fileHandle2, "test\n"
+;MPrintF "writing to file...\n"
+;MFPrintF fileHandle2, "test\n"
+;MFWrite fileHandle2, #str1, #10
+
+MPrintF "sending command...\n"
+MLoadR A, #command
+lda #8
+jsr SendCommand
+jmp next
+command .text "MD/:test"
+next:
+
+MPrintF "reading file...\n"
+MFRead fileHandle2, #what, #10
+MPrintF "read: %s\n", what
 
 MPrintF "closing file...\n"
 lda fileHandle2
@@ -53,6 +67,8 @@ bcc +
 	MPrintF "File Error! - Abort\n"
 	jmp End
 +
+
+
 
 ;MPrintF "Vera Layer0 Config %b\n", L0_CONFIG
 ;MPrintF "Vera Layer1 Config %b\n", L1_CONFIG
@@ -163,6 +179,7 @@ MPrintF "Good Bye.\n"
 .dsection data
 
 str1 	.text "this is a string %c hihi %x und ciao and %s", 0
+what: .text "                                   ",0
 
 v1	.byte "U"
 v2	.byte $1F
